@@ -1,0 +1,29 @@
+{
+  "name": "abhix-portfolio-lambda",
+  "version": "1.0.0",
+  "description": "Portfolio contact form mailer — AWS Lambda + API Gateway (Serverless Framework)",
+  "main": "dist/handler.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/handler.ts",
+    "build": "tsc",
+    "deploy": "bash scripts/deploy.sh",
+    "deploy:prod": "bash scripts/deploy.sh prod",
+    "offline": "serverless offline start",
+    "logs": "npx serverless logs -f contact --region ap-south-1 --stage dev --tail"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.9"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.136",
+    "@types/node": "^20.11.5",
+    "@types/nodemailer": "^6.4.14",
+    "serverless": "^3.40.0",
+    "serverless-dotenv-plugin": "^6.0.0",
+    "serverless-offline": "^13.3.3",
+    "serverless-plugin-typescript": "^2.1.5",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}

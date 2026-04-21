@@ -1,0 +1,114 @@
+# serverless.yml — abhix-portfolio-lambda
+# Contact form mailer for abhix.in
+# Mirrors the NarrativeZone pattern: API Gateway HTTP proxy → Lambda → Gmail SMTP
+
+service: abhix-portfolio-lambda
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-dotenv-plugin
+  - serverless-offline
+
+useDotenv: true
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${opt:region, 'ap-south-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 128        # contact mailer needs very little RAM
+  timeout: 15            # Gmail SMTP rarely needs more than 5s
+
+  apiGateway:
+    shouldStartNameWithService: true
+
+  environment:
+    NODE_ENV:            ${self:provider.stage}
+    # ── Mailer ────────────────────────────────────────────────────────────────
+    # These are loaded from .env (local dev) or Lambda env vars (prod).
+    # Never commit real values — .env is in .gitignore.
+    EMAIL_USER:          ${env:EMAIL_USER, ''}
+    EMAIL_APP_PASSWORD:  ${env:EMAIL_APP_PASSWORD, ''}
+    OWNER_EMAIL:         ${env:OWNER_EMAIL, ''}
+    # ── CORS ──────────────────────────────────────────────────────────────────
+    ALLOWED_ORIGIN:      ${env:ALLOWED_ORIGIN, 'http://localhost:5173'}
+
+  # Lambda needs no special IAM permissions beyond basic execution (CloudWatch logs)
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: arn:aws:logs:${self:provider.region}:*:*
+
+functions:
+  contact:
+    handler: src/handler.handler
+    description: "Handles portfolio contact form submissions and sends email via Gmail SMTP"
+    events:
+      # POST /contact  — form submission
+      - http:
+          path: /contact
+          method: POST
+          cors:
+            origins:
+              - http://localhost:5173
+              - http://localhost:4173
+              - https://www.abhix.in
+              - https://www.abhix.in
+              - ${env:ALLOWED_ORIGIN, 'http://localhost:5173'}
+            headers:
+              - Content-Type
+            allowCredentials: false
+      # OPTIONS /contact — browser CORS preflight
+      - http:
+          path: /contact
+          method: OPTIONS
+          cors:
+            origins:
+              - http://localhost:5173
+              - http://localhost:4173
+              - https://www.abhix.in
+              - https://www.abhix.in
+              - ${env:ALLOWED_ORIGIN, 'http://localhost:5173'}
+            headers:
+              - Content-Type
+            allowCredentials: false
+
+custom:
+  serverless-offline:
+    httpPort: 4000       # avoids conflict with narrativezone-backend on 5000
+    lambdaPort: 4002
+  dotenv:
+    path: .env
+    logging: false
+
+# ── Gateway Responses — CORS on all error responses ──────────────────────────
+# Without this, 4xx/5xx from Lambda bypass CORS middleware and the browser
+# sees a network error instead of a readable message.
+resources:
+  Resources:
+    GatewayResponseDefault4XX:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseType: DEFAULT_4XX
+        RestApiId: !Ref ApiGatewayRestApi
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin:  "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type'"
+          gatewayresponse.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+
+    GatewayResponseDefault5XX:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseType: DEFAULT_5XX
+        RestApiId: !Ref ApiGatewayRestApi
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin:  "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type'"
+          gatewayresponse.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
